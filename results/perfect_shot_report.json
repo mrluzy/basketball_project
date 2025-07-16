@@ -1,0 +1,31 @@
+{
+  "scene_setup": {
+    "robot_position": [
+      0.0,
+      0.0,
+      1.0
+    ],
+    "basket_position": [
+      4.5,
+      2.0,
+      3.05
+    ],
+    "horizontal_distance": 4.924428900898052,
+    "height_difference": 2.05
+  },
+  "shooting_parameters": {
+    "initial_velocity": 14.14083968210193,
+    "pitch_angle_degrees": 29.999999999999996,
+    "yaw_angle_degrees": 23.962488974578186
+  },
+  "performance_metrics": {
+    "hit_error_mm": 0.0,
+    "flight_time_s": 0.42,
+    "maximum_height_m": 3.05,
+    "final_position": [
+      4.5,
+      2.0,
+      3.05
+    ]
+  }
+}

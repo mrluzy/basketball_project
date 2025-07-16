@@ -1,0 +1,31 @@
+{
+  "model_config": {
+    "type": "standard",
+    "input_size": 5,
+    "hidden_sizes": [
+      64,
+      64
+    ],
+    "output_size": 3,
+    "dropout_rate": 0.1,
+    "activation": "relu"
+  },
+  "training_config": {
+    "learning_rate": 0.001,
+    "weight_decay": 1e-05,
+    "optimizer": "adam",
+    "batch_size": 32,
+    "epochs": 100,
+    "patience": 20
+  },
+  "performance_metrics": {
+    "mse": 0.01291772909831825,
+    "mae": 0.056369465012838384,
+    "r2": 0.8791837830854452,
+    "relative_error_percent": 23.29882307419312
+  },
+  "model_complexity": {
+    "parameters": 4739,
+    "estimated_size_mb": 0.018077850341796875
+  }
+}
