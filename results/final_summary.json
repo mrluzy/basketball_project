@@ -1,6 +1,5 @@
 {
   "model_config": {
-    "type": "standard",
     "input_size": 5,
     "hidden_sizes": [
       64,
@@ -19,10 +18,9 @@
     "patience": 20
   },
   "performance_metrics": {
-    "mse": 0.01399651705249425,
-    "mae": 0.06093494350930437,
-    "r2": 0.8796872559651838,
-    "relative_error_percent": 37.85408754455263
+    "mse": 0.013413112940647072,
+    "mae": 0.05904198120742893,
+    "r2": 0.8937758729969096
   },
   "model_complexity": {
     "parameters": 4739,

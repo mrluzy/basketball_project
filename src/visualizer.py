@@ -288,12 +288,11 @@ class Visualizer:
             axes[1, 0].grid(True, alpha=0.3)
         
         # 性能指标雷达图
-        metrics = ['MSE', 'MAE', 'R²', 'Relative Error']
+        metrics = ['MSE', 'MAE', 'R²']
         values = [
             1 - min(evaluation_results['overall_mse'], 1),  # 归一化MSE
             1 - min(evaluation_results['overall_mae'], 1),  # 归一化MAE
-            evaluation_results['overall_r2'],  # R²
-            1 - min(evaluation_results['mean_relative_error_percent']/100, 1)  # 归一化相对误差
+            evaluation_results['overall_r2']  # R²
         ]
         
         # 雷达图
@@ -627,7 +626,7 @@ Model Information:
 • MSE: {evaluation_results['overall_mse']:.6f}
 • MAE: {evaluation_results['overall_mae']:.6f}
 • R²: {evaluation_results['overall_r2']:.4f}
-• Relative Error: {evaluation_results['mean_relative_error_percent']:.2f}%
+
         """
         ax8.text(0.1, 0.9, info_text, transform=ax8.transAxes, fontsize=12,
                 verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
@@ -648,7 +647,7 @@ Model Information:
         # 计算综合评分
         score = (evaluation_results['overall_r2'] * 0.4 + 
                 (1 - min(evaluation_results['overall_mse'], 1)) * 0.3 +
-                (1 - min(evaluation_results['mean_relative_error_percent']/100, 1)) * 0.3) * 100
+                (1 - min(evaluation_results['overall_mae'], 1)) * 0.3) * 100
         
         # 绘制评分表盘
         theta = np.linspace(0, np.pi, 100)

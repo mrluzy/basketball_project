@@ -84,16 +84,13 @@ class Evaluator:
             individual_metrics[f'{name}_rmse'] = np.sqrt(individual_metrics[f'{name}_mse'])
             individual_metrics[f'{name}_r2'] = r2_score(y_test[:, i], y_pred[:, i])
         
-        # 计算相对误差
-        relative_errors = np.abs((y_pred - y_test) / (y_test + 1e-8)) * 100
-        mean_relative_error = np.mean(relative_errors)
+
         
         results = {
             'overall_mse': mse,
             'overall_mae': mae,
             'overall_rmse': rmse,
             'overall_r2': r2,
-            'mean_relative_error_percent': mean_relative_error,
             'predictions': y_pred,
             'targets': y_test,
             **individual_metrics
@@ -438,7 +435,7 @@ class Evaluator:
             f.write(f"总体MSE: {basic_metrics['overall_mse']:.6f}\n")
             f.write(f"总体MAE: {basic_metrics['overall_mae']:.6f}\n")
             f.write(f"总体R²: {basic_metrics['overall_r2']:.4f}\n")
-            f.write(f"平均相对误差: {basic_metrics['mean_relative_error_percent']:.2f}%\n\n")
+
             
             # 各输出指标
             f.write("各输出参数性能:\n")

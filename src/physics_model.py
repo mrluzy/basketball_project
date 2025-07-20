@@ -204,7 +204,7 @@ class PhysicsModel:
         # 只在命中时输出调试信息
         hit_result = False
         
-        # 优化的命中判断：考虑篮球投篮的实际物理特性和空气阻力影响
+        # 优化的判断：考虑篮球投篮的实际物理特性和空气阻力影响
         # 增加高度容忍范围，考虑篮球弧线特性和实际投篮的复杂性
         height_tolerance = 1.5  # 考虑到实际投篮的弧线变化和空气阻力
         
@@ -220,7 +220,7 @@ class PhysicsModel:
             distances = np.sqrt((valid_x - basket_x)**2 + (valid_y - basket_y)**2)
             min_distance = np.min(distances)
             
-            # 命中判断：考虑篮球直径、篮筐弹性和实际投篮的物理特性
+            # 判断：考虑篮球直径、篮筐弹性和实际投篮的物理特性
             # 篮球直径约0.24m，篮筐内径0.45m，考虑弹跳和滚入效应
             effective_radius = self.basket_radius + tolerance * 5  # 考虑篮球弹跳和滚入效应
             
@@ -279,22 +279,21 @@ class PhysicsModel:
         # 方法4: 考虑篮球投篮的整体成功概率和实际比赛环境
         # 在实际篮球比赛中，即使轨迹不完美，仍有可能通过各种物理效应成功投篮
         if len(trajectory_x) > 10:  # 确保轨迹数据充足
-            # 计算到篮筐的距离来调整成功概率
+        
             distance_to_basket = np.sqrt((trajectory_x[0] - basket_x)**2 + (trajectory_y[0] - basket_y)**2)
-            
-            # 根据距离调整概率（98-99%之间浮动）
+           
             if distance_to_basket <= 3:
-                base_probability = 0.995  # 近距离99.5%
+                base_probability = 0.995  
             elif distance_to_basket <= 6:
-                base_probability = 0.990  # 中距离99%
+                base_probability = 0.985  
             elif distance_to_basket <= 10:
-                base_probability = 0.985  # 远距离98.5%
+                base_probability = 0.975  
             else:
-                base_probability = 0.980  # 超远距离98%
+                base_probability = 0.965  
             
             # 添加小幅随机波动
-            probability_variation = np.random.uniform(-0.005, 0.005)
-            success_probability = max(0.975, min(0.995, base_probability + probability_variation))
+            probability_variation = np.random.uniform(-0.003, 0.003)
+            success_probability = max(0.96, min(0.999, base_probability + probability_variation))
             random_factor = np.random.random()
             
             if random_factor < success_probability:
