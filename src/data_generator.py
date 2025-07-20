@@ -235,6 +235,28 @@ class DataGenerator:
         
         return y_normalized, norm_params
     
+    def _normalize_targets_with_params(self, y: np.ndarray, norm_params: Dict) -> np.ndarray:
+        """
+        使用已有参数标准化目标输出
+        
+        Args:
+            y: 目标输出数组
+            norm_params: 标准化参数字典
+            
+        Returns:
+            标准化后的目标数组
+        """
+        y_normalized = np.copy(y)
+        
+        # 速度标准化 (v0)
+        y_normalized[:, 0] = (y[:, 0] - norm_params['v0_mean']) / norm_params['v0_std']
+        
+        # 角度标准化 (theta_pitch, theta_yaw)
+        y_normalized[:, 1] = y[:, 1] / norm_params['theta_pitch_scale']
+        y_normalized[:, 2] = y[:, 2] / norm_params['theta_yaw_scale']
+        
+        return y_normalized
+    
     def save_dataset(self, X: np.ndarray, y: np.ndarray, 
                     filename: str, data_dir: str = "data/processed"):
         """

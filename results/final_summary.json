@@ -19,10 +19,10 @@
     "patience": 20
   },
   "performance_metrics": {
-    "mse": 0.01291772909831825,
-    "mae": 0.056369465012838384,
-    "r2": 0.8791837830854452,
-    "relative_error_percent": 23.29882307419312
+    "mse": 0.01399651705249425,
+    "mae": 0.06093494350930437,
+    "r2": 0.8796872559651838,
+    "relative_error_percent": 37.85408754455263
   },
   "model_complexity": {
     "parameters": 4739,

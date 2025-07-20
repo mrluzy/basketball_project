@@ -18,6 +18,7 @@ warnings.filterwarnings('ignore')
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 import numpy as np
+import pandas as pd
 import torch
 from loguru import logger
 from tqdm import tqdm
@@ -90,7 +91,63 @@ def print_banner():
 
 
 def generate_training_data(config: dict) -> tuple:
-    """生成训练数据"""
+    """生成或加载训练数据"""
+    
+    # 检查本地数据文件是否存在
+    dataset_path = "data/processed/full_dataset.csv"
+    norm_params_path = "data/processed/normalization_params.json"
+    
+    if os.path.exists(dataset_path) and os.path.exists(norm_params_path):
+        logger.info("发现本地数据文件，正在加载...")
+        
+        # 初始化物理模型
+        physics_model = PhysicsModel(
+            gravity=config['physics']['gravity'],
+            air_resistance=config['physics']['air_resistance']
+        )
+        
+        data_generator = DataGenerator(physics_model)
+        
+        try:
+            # 加载数据集
+            df = pd.read_csv(dataset_path)
+            X = df[['robot_x', 'robot_y', 'basket_x', 'basket_y', 'basket_height']].values
+            y = df[['v0', 'theta_pitch', 'theta_yaw']].values
+            
+            # 加载标准化参数
+            with open(norm_params_path, 'r') as f:
+                norm_params_data = json.load(f)
+            
+            # 重构标准化参数
+            norm_params = {}
+            for key, value in norm_params_data.items():
+                norm_params[key] = {}
+                for k, v in value.items():
+                    if isinstance(v, list):
+                        norm_params[key][k] = np.array(v)
+                    else:
+                        norm_params[key][k] = v
+            
+            # 应用标准化
+            X_normalized = (X - norm_params['X_norm_params']['mean']) / norm_params['X_norm_params']['std']
+            y_normalized = data_generator._normalize_targets_with_params(y, norm_params['y_norm_params'])
+            
+            # 划分数据集
+            X_train, X_val, X_test, y_train, y_val, y_test = data_generator.split_dataset(
+                X_normalized, y_normalized,
+                train_ratio=config['data']['train_ratio'],
+                val_ratio=config['data']['val_ratio']
+            )
+            
+            logger.info(f"数据加载完成 - 总样本: {len(X)}, 训练: {len(X_train)}, 验证: {len(X_val)}, 测试: {len(X_test)}")
+            
+            return (X_train, X_val, X_test, y_train, y_val, y_test, 
+                    physics_model, norm_params)
+                    
+        except Exception as e:
+            logger.warning(f"加载本地数据失败: {e}，将重新生成数据")
+    
+    # 如果本地数据不存在或加载失败，重新生成数据
     logger.info("开始生成训练数据...")
     
     # 初始化物理模型和数据生成器
@@ -384,17 +441,57 @@ def demonstrate_model(model, physics_model, norm_params):
     """演示模型预测功能"""
     logger.info("开始模型预测演示...")
     
-    # 测试场景
-    test_scenarios = [
-        {"name": "近距离投篮", "robot": (0, 0), "basket": (2, 0, 3.05)},
-        {"name": "中距离投篮", "robot": (0, 0), "basket": (5, 0, 3.05)},
-        {"name": "远距离投篮", "robot": (0, 0), "basket": (8, 0, 3.05)},
-        {"name": "侧面投篮", "robot": (0, 0), "basket": (3, 4, 3.05)},
-    ]
+    # 生成200个测试场景
+    test_scenarios = []
+    np.random.seed(42)  # 确保结果可重现
+    
+    # 生成多样化的测试场景
+    for i in range(200):
+        # 随机生成机器人位置
+        robot_x = np.random.uniform(-10, 10)
+        robot_y = np.random.uniform(-8, 8)
+        
+        # 随机生成篮筐位置
+        basket_x = np.random.uniform(-10, 10)
+        basket_y = np.random.uniform(-8, 8)
+        basket_z = np.random.uniform(2.8, 3.3)  # 篮筐高度稍有变化
+        
+        # 确保距离在合理范围内（1-15米）
+        distance = np.sqrt((basket_x - robot_x)**2 + (basket_y - robot_y)**2)
+        if distance < 1.0:
+            # 如果距离太近，调整篮筐位置
+            angle = np.random.uniform(0, 2*np.pi)
+            basket_x = robot_x + 2.0 * np.cos(angle)
+            basket_y = robot_y + 2.0 * np.sin(angle)
+        elif distance > 15.0:
+            # 如果距离太远，调整篮筐位置
+            angle = np.random.uniform(0, 2*np.pi)
+            basket_x = robot_x + 10.0 * np.cos(angle)
+            basket_y = robot_y + 10.0 * np.sin(angle)
+        
+        # 根据距离分类场景
+        distance = np.sqrt((basket_x - robot_x)**2 + (basket_y - robot_y)**2)
+        if distance <= 3:
+            scenario_type = "近距离"
+        elif distance <= 6:
+            scenario_type = "中距离"
+        elif distance <= 10:
+            scenario_type = "远距离"
+        else:
+            scenario_type = "超远距离"
+        
+        test_scenarios.append({
+            "name": f"{scenario_type}投篮_{i+1:03d}",
+            "robot": (robot_x, robot_y),
+            "basket": (basket_x, basket_y, basket_z)
+        })
     
     print("\n" + "="*80)
     print("🎯 模型预测演示")
     print("="*80)
+    
+    # 存储命中率统计数据
+    hit_results = []
     
     for scenario in test_scenarios:
         robot_x, robot_y = scenario["robot"]
@@ -418,13 +515,55 @@ def demonstrate_model(model, physics_model, norm_params):
         theta_pitch_pred = prediction_norm[1] * y_norm_params['theta_pitch_scale']
         theta_yaw_pred = prediction_norm[2] * y_norm_params['theta_yaw_scale']
         
+        # 计算预测轨迹并检查是否命中
+        try:
+            t, x_traj, y_traj, z_traj = physics_model.calculate_trajectory(
+                robot_x, robot_y, 1.0,  # 机器人高度1米
+                v0_pred, theta_pitch_pred, theta_yaw_pred
+            )
+            print(f"\n🔍 神经网络预测命中判断:")
+            hit_pred = physics_model.check_trajectory_success(
+                x_traj, y_traj, z_traj, basket_x, basket_y, basket_z, debug=True
+            )
+        except:
+            hit_pred = False
+        
         # 物理模型理论解
         try:
             v0_theory, theta_pitch_theory, theta_yaw_theory = physics_model.calculate_optimal_params(
                 robot_x, robot_y, 1.0, basket_x, basket_y, basket_z
             )
+            # 计算理论轨迹并检查是否命中
+            t_theory, x_theory, y_theory, z_theory = physics_model.calculate_trajectory(
+                robot_x, robot_y, 1.0,
+                v0_theory, theta_pitch_theory, theta_yaw_theory
+            )
+            print(f"\n🔍 物理模型理论解命中判断:")
+            hit_theory = physics_model.check_trajectory_success(
+                x_theory, y_theory, z_theory, basket_x, basket_y, basket_z, debug=True
+            )
         except:
             v0_theory = theta_pitch_theory = theta_yaw_theory = None
+            hit_theory = False
+        
+        # 将偏向角转换为0-180度范围
+        theta_yaw_pred_degrees = np.degrees(theta_yaw_pred)
+        if theta_yaw_pred_degrees < 0:
+            theta_yaw_pred_degrees += 180
+        
+        # 存储结果用于命中率表格
+        hit_results.append({
+            'scenario': scenario['name'],
+            'distance': np.sqrt((basket_x-robot_x)**2 + (basket_y-robot_y)**2),
+            'v0_pred': v0_pred,
+            'theta_pitch_pred': np.degrees(theta_pitch_pred),
+            'theta_yaw_pred': theta_yaw_pred_degrees,
+            'hit_pred': hit_pred,
+            'v0_theory': v0_theory,
+            'theta_pitch_theory': np.degrees(theta_pitch_theory) if theta_pitch_theory else None,
+            'theta_yaw_theory': np.degrees(theta_yaw_theory) if theta_yaw_theory else None,
+            'hit_theory': hit_theory
+        })
         
         # 打印结果
         print(f"\n📍 {scenario['name']}:")
@@ -435,18 +574,61 @@ def demonstrate_model(model, physics_model, norm_params):
         print(f"   🤖 神经网络预测:")
         print(f"      初速度: {v0_pred:.2f} m/s")
         print(f"      仰角: {np.degrees(theta_pitch_pred):.1f}°")
-        print(f"      偏向角: {np.degrees(theta_yaw_pred):.1f}°")
+        print(f"      偏向角: {theta_yaw_pred_degrees:.1f}°")
+        print(f"      命中结果: {'✅ 命中' if hit_pred else '❌ 未命中'}")
         
         if v0_theory is not None:
             print(f"   📐 物理模型理论解:")
             print(f"      初速度: {v0_theory:.2f} m/s")
             print(f"      仰角: {np.degrees(theta_pitch_theory):.1f}°")
             print(f"      偏向角: {np.degrees(theta_yaw_theory):.1f}°")
+            print(f"      命中结果: {'✅ 命中' if hit_theory else '❌ 未命中'}")
             
             print(f"   📊 误差分析:")
             print(f"      速度误差: {abs(v0_pred - v0_theory):.3f} m/s")
             print(f"      仰角误差: {abs(np.degrees(theta_pitch_pred - theta_pitch_theory)):.1f}°")
             print(f"      偏向角误差: {abs(np.degrees(theta_yaw_pred - theta_yaw_theory)):.1f}°")
+    
+    # 计算命中率统计
+    nn_hits = 0
+    theory_hits = 0
+    total_scenarios = len(hit_results)
+    
+    for result in hit_results:
+        if result['hit_pred']:
+            nn_hits += 1
+        if result['hit_theory']:
+            theory_hits += 1
+    
+    # 保存命中率统计表格到文件
+    table_file = "results/hit_rate_table.txt"
+    with open(table_file, 'w', encoding='utf-8') as f:
+        f.write("="*120 + "\n")
+        f.write("📊 命中率统计表格\n")
+        f.write("="*120 + "\n")
+        f.write(f"{'场景':<12} {'距离(m)':<8} {'神经网络预测':<45} {'物理模型理论':<45}\n")
+        f.write(f"{'':^12} {'':^8} {'初速度(m/s)':<12} {'仰角(°)':<10} {'偏向角(°)':<12} {'命中':<8} {'初速度(m/s)':<12} {'仰角(°)':<10} {'偏向角(°)':<12} {'命中':<8}\n")
+        f.write("-" * 120 + "\n")
+        
+        for result in hit_results:
+            hit_pred_str = "✅" if result['hit_pred'] else "❌"
+            hit_theory_str = "✅" if result['hit_theory'] else "❌"
+            
+            theory_v0 = f"{result['v0_theory']:.2f}" if result['v0_theory'] else "N/A"
+            theory_pitch = f"{result['theta_pitch_theory']:.1f}" if result['theta_pitch_theory'] else "N/A"
+            theory_yaw = f"{result['theta_yaw_theory']:.1f}" if result['theta_yaw_theory'] else "N/A"
+            
+            f.write(f"{result['scenario']:<12} {result['distance']:<8.1f} "
+                   f"{result['v0_pred']:<12.2f} {result['theta_pitch_pred']:<10.1f} {result['theta_yaw_pred']:<12.1f} {hit_pred_str:<8} "
+                   f"{theory_v0:<12} {theory_pitch:<10} {theory_yaw:<12} {hit_theory_str:<8}\n")
+        
+        f.write("-" * 120 + "\n")
+        f.write(f"总命中率统计:\n")
+        f.write(f"  神经网络模型: {nn_hits}/{total_scenarios} ({nn_hits/total_scenarios*100:.1f}%)\n")
+        f.write(f"  物理模型理论: {theory_hits}/{total_scenarios} ({theory_hits/total_scenarios*100:.1f}%)\n")
+        f.write("\n生成时间: " + time.strftime("%Y-%m-%d %H:%M:%S") + "\n")
+    
+    print(f"\n📁 命中率统计表格已保存到: {table_file}")
     
     print("\n" + "="*80)
     logger.info("模型预测演示完成")
